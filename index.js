@@ -28,7 +28,7 @@ app.get("/manifest.json", (req, res) => {
         name: "أفلام عربية"
       }
     ],
-    idPrefixes: ["tmdb:", "tt"]
+    idPrefixes: ["tmdb:"]
   });
 });
 
@@ -61,31 +61,30 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (توليد الـ 5 سيرفرات المطلوبة دائماً)
+// 3. Streams (ربط مباشر بالسيرفرات المتاحة)
 app.get("/stream/movie/:id.json", async (req, res) => {
-  const rawId = req.params.id;
+  const tmdbId = req.params.id.replace("tmdb:", "");
 
-  // سيرفرات بث مباشرة وثابتة بجودات مختلفة لضمان التشغيل دائماً
   const streams = [
     {
-      title: "WeCima | 1080p [سيرفر رئيسي 1]",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+      title: "🔥 Fast Server 1 | 1080p Full HD",
+      url: `https://vidsrc.to/embed/movie/${tmdbId}`
     },
     {
-      title: "FaselHD | 1080p [سيرفر رئيسي 2]",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+      title: "🎬 ArabServer | 1080p HD",
+      url: `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
     },
     {
-      title: "WeCima | 720p [سيرفر سريع 1]",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+      title: "⚡ StreamHQ | 720p HD",
+      url: `https://embed.su/embed/movie/${tmdbId}`
     },
     {
-      title: "FaselHD | 720p [سيرفر سريع 2]",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+      title: "📱 Mobile Server | 720p",
+      url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
     },
     {
-      title: "FaselHD | 480p [جودة منخفضة]",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
+      title: "📉 Data Saver | 480p",
+      url: `https://vidsrc.icu/embed/movie/${tmdbId}`
     }
   ];
 
