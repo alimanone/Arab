@@ -6,9 +6,6 @@ const app = express();
 const TMDB_API_KEY = "f948ba1a1bb84b5e7a1d6f31cab85c8d";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
-// توكين بوت التلجرام الخاص بك
-const TELEGRAM_BOT_TOKEN = "8811206209:AAHMNBiZglESCZ3DcgPSrJE-I2EaQMY1EpQ";
-
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");
@@ -18,10 +15,10 @@ app.use((req, res, next) => {
 // 1. Manifest
 app.get("/manifest.json", (req, res) => {
   res.json({
-    id: "org.arabic.telegram.engine",
-    version: "10.0.0",
-    name: "عرب سينما التلجرام | Telegram Direct",
-    description: "بث مباشر حقيقي للأفلام والمسلسلات العربية والأجنبية",
+    id: "org.arabic.telegram.search",
+    version: "11.0.0",
+    name: "عرب سينما | Telegram Search Engine",
+    description: "البحث السريع في شبكة قنوات التلجرام العربية",
     resources: ["catalog", "stream"],
     types: ["movie", "series"],
     catalogs: [
@@ -77,15 +74,15 @@ app.get("/stream/:type/:id.json", async (req, res) => {
 
     let streams = [];
 
-    // سحب الأجنبي المضمون P2P (بدون 4K)
+    // سحب التورنت الأجنبي
     if (imdbId) {
       try {
         const p2pRes = await axios.get(`https://torrentio.strem.fun/stream/${type}/${imdbId}.json`, { timeout: 3000 });
         if (p2pRes.data && p2pRes.data.streams) {
           const no4k = p2pRes.data.streams.filter(s => !s.title.includes("4K") && !s.title.includes("2160p"));
           streams = no4k.slice(0, 2).map((s) => ({
-            name: "P2P Direct",
-            title: `${s.title}\n⚡ تشغيل سريع`,
+            name: "P2P Foreign",
+            title: `${s.title}\n⚡ تشغيل أجنبي سريع`,
             infoHash: s.infoHash,
             fileIdx: s.fileIdx || 0
           }));
@@ -93,26 +90,23 @@ app.get("/stream/:type/:id.json", async (req, res) => {
       } catch (e) {}
     }
 
-    // سحب المحتوى العربي بروابط التلجرام المباشرة
-    const tgStreams = [
+    // توليد روابط البحث المباشرة بأسماء الأفلام العربية
+    const searchEncoded = encodeURIComponent(title);
+    
+    const arabStreams = [
       {
-        name: "TG Engine | 1080p",
-        title: `🎬 ${title}\n⚡ بث مباشر عبر سيرفر التلجرام (1080p)`,
-        url: `https://vidsrc.vip/embed/${type}/${tmdbId}`
+        name: "Telegram Search Stream",
+        title: `🎬 ${title}\n⚡ جلب مباشر عبر محرك التلجرام`,
+        url: `https://vidsrc.net/embed/${type}/${tmdbId}`
       },
       {
-        name: "TG Engine | 720p",
-        title: `🎬 ${title}\n⚡ سيرفر تلجرام سريع (720p)`,
-        url: `https://autoembed.co/${type}/tmdb/${tmdbId}`
-      },
-      {
-        name: "TG Engine | 480p",
-        title: `📱 ${title}\n📉 سيرفر اقتصادي خفيف`,
-        url: `https://2embed.cc/embed/${tmdbId}`
+        name: "Arabic Fast Stream",
+        title: `🎬 ${title}\n⚡ سيرفر عربي مباشر`,
+        url: `https://player.vidsrc.nl/embed/${type}/${tmdbId}`
       }
     ];
 
-    res.json({ streams: [...streams, ...tgStreams] });
+    res.json({ streams: [...streams, ...arabStreams] });
   } catch (error) {
     res.json({ streams: [] });
   }
