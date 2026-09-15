@@ -12,13 +12,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// 1. Manifest (معرف خصيصاً للتوافق مع Nuvio)
+// 1. Manifest
 app.get("/manifest.json", (req, res) => {
   res.json({
-    id: "org.arabic.addon.ali.nuvio",
-    version: "3.0.0",
-    name: "عرب سينما Nuvio | Ali",
-    description: "إضافة الأفلام العربية المحسنة لمشغلات Nuvio و Stremio",
+    id: "org.arabic.addon.ali.torrent",
+    version: "4.0.0",
+    name: "عرب تورنت | Nuvio & Stremio",
+    description: "تشغيل الأفلام العربية عبر شبكة التورنت المباشرة (FMHY)",
     resources: ["catalog", "stream"],
     types: ["movie"],
     catalogs: [
@@ -32,7 +32,7 @@ app.get("/manifest.json", (req, res) => {
   });
 });
 
-// 2. Catalog (كتالوج ومحتوى عالي الدقة)
+// 2. Catalog
 app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
@@ -62,46 +62,54 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (استجابة بتنسيق Direct Stream متوافق مع Nuvio)
+// 3. Streams (سحب التورنت المباشر بروابط FMHY/P2P)
 app.get("/stream/movie/:id.json", async (req, res) => {
   const rawId = req.params.id;
   const tmdbId = rawId.replace("tmdb:", "");
 
   try {
+    // جلب IMDb ID لضمان البحث في شبكات التورنت
     const tmdbRes = await axios.get(`${TMDB_BASE_URL}/movie/${tmdbId}`, {
-      params: { api_key: TMDB_API_KEY, language: "ar-EG" }
+      params: { api_key: TMDB_API_KEY }
     });
+    const imdbId = tmdbRes.data.imdb_id;
 
-    // سحب الروابط بتنسيقات يفهمها Nuvio Player مباشرة
-    const streams = [
-      {
-        name: "Nuvio VIP",
-        title: "🎬 ArabStream | 1080p FHD\n⚡ تشغيل فوري مجاني",
-        url: `https://vidsrc.stream/embed/movie/${tmdbId}`
-      },
-      {
-        name: "Nuvio Fast",
-        title: "🎬 CimaDrive | 1080p HD\n⚡ سيرفر سريع",
-        url: `https://autoembed.co/movie/tmdb/${tmdbId}`
-      },
-      {
-        name: "Nuvio Mobile",
-        title: "⚡ AkoamDirect | 720p\n📱 مناسب للموبايل",
-        url: `https://moviesapi.club/movie/${tmdbId}`
-      },
-      {
-        name: "Nuvio Light",
-        title: "⚡ FaselStream | 720p\n📱 سيرفر بديل",
-        url: `https://player.smashystream.com/movie/${tmdbId}`
-      },
-      {
-        name: "Nuvio Low",
-        title: "📱 DataSaver | 480p\n📉 اقتصادي",
-        url: `https://2embed.cc/embed/${tmdbId}`
+    let streams = [];
+
+    // جلب التورنت المباشر عبر محرك P2P المفتوح
+    if (imdbId) {
+      try {
+        const torrentRes = await axios.get(`https://torrentio.strem.fun/stream/movie/${imdbId}.json`, { timeout: 3000 });
+        if (torrentRes.data && torrentRes.data.streams) {
+          streams = torrentRes.data.streams.map((s, index) => ({
+            name: "عرب تورنت P2P",
+            title: `🎬 ${s.title || 'فيلم عربي'}\n⚙️ جودة عالية - تشغيل مباشر`,
+            infoHash: s.infoHash,
+            fileIdx: s.fileIdx || 0
+          }));
+        }
+      } catch (e) {
+        console.log("Torrent fetch failed, switching to backup servers");
       }
-    ];
+    }
 
-    res.json({ streams });
+    // إذا لم يجد تورنت مباشر، يضع سيرفرات الفيديو السريعة كبديل
+    if (streams.length === 0) {
+      streams = [
+        {
+          name: "ArabStream VIP",
+          title: "🎬 ArabStream | 1080p FHD\n⚡ تشغيل مباشر",
+          url: `https://vidsrc.stream/embed/movie/${tmdbId}`
+        },
+        {
+          name: "ArabStream HD",
+          title: "🎬 CimaDrive | 720p HD\n⚡ سيرفر سريع",
+          url: `https://autoembed.co/movie/tmdb/${tmdbId}`
+        }
+      ];
+    }
+
+    res.json({ streams: streams.slice(0, 5) });
   } catch (error) {
     res.json({ streams: [] });
   }
