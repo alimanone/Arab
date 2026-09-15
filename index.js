@@ -18,7 +18,7 @@ app.get("/manifest.json", (req, res) => {
     id: "org.arabic.addon.ali",
     version: "1.0.0",
     name: "عرب سينما | Ali",
-    description: "إضافة الأفلام العربية بأعلى جودة بوسترات وسيرفرات متعددة",
+    description: "إضافة الأفلام العربية بسيرفرات تشغيل مباشرة",
     resources: ["catalog", "stream"],
     types: ["movie"],
     catalogs: [
@@ -28,11 +28,11 @@ app.get("/manifest.json", (req, res) => {
         name: "أفلام عربية"
       }
     ],
-    idPrefixes: ["tmdb:", "tt"]
+    idPrefixes: ["tmdb:"]
   });
 });
 
-// 2. Catalog (أعلى جودة بوسترات عربية من TMDB)
+// 2. Catalog (أعلى جودة بوسترات عربية)
 app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
@@ -62,32 +62,37 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (الروابط الـ 5 المحددة بالجودات)
+// 3. Streams (روابط سيرفرات فيديو عربية مباشرة)
 app.get("/stream/movie/:id.json", async (req, res) => {
-  const rawId = req.params.id;
-  const tmdbId = rawId.replace("tmdb:", "");
+  const tmdbId = req.params.id.replace("tmdb:", "");
 
   try {
+    // جلب اسم الفيلم بالعربي من TMDB للبحث
+    const tmdbRes = await axios.get(`${TMDB_BASE_URL}/movie/${tmdbId}`, {
+      params: { api_key: TMDB_API_KEY, language: "ar-EG" }
+    });
+    
+    // روابط الفيديو السريعة بالجودات الـ 5 المحددة
     const streams = [
       {
-        title: "🎬 WeCima | 1080p (سيرفر رئيسي 1)",
-        url: `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
+        title: "🎬 ArabStream | 1080p (سيرفر رئيسي 1)",
+        url: `https://vidsrc.net/embed/movie/${tmdbId}`
       },
       {
-        title: "🎬 FaselHD | 1080p (سيرفر رئيسي 2)",
-        url: `https://vidsrc.to/embed/movie/${tmdbId}`
+        title: "🎬 FaselVIP | 1080p (سيرفر رئيسي 2)",
+        url: `https://player.autoembed.cc/embed/movie/${tmdbId}`
       },
       {
-        title: "⚡ WeCima | 720p (سيرفر سريع 1)",
-        url: `https://embed.su/embed/movie/${tmdbId}`
+        title: "⚡ CimaFast | 720p (سيرفر سريع 1)",
+        url: `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`
       },
       {
-        title: "⚡ FaselHD | 720p (سيرفر سريع 2)",
+        title: "⚡ ArabHD | 720p (سيرفر سريع 2)",
+        url: `https://www.2embed.cc/embed/${tmdbId}`
+      },
+      {
+        title: "📱 MobileServer | 480p (سيرفر اقتصادي)",
         url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
-      },
-      {
-        title: "📱 FaselHD | 480p (سيرفر اقتصادي)",
-        url: `https://vidsrc.icu/embed/movie/${tmdbId}`
       }
     ];
 
