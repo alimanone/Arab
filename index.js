@@ -18,7 +18,7 @@ app.get("/manifest.json", (req, res) => {
     id: "org.arabic.addon.ali",
     version: "1.0.0",
     name: "عرب سينما | Ali",
-    description: "إضافة الأفلام العربية بجودات متعددة",
+    description: "إضافة الأفلام العربية بأعلى جودة بوسترات وسيرفرات متعددة",
     resources: ["catalog", "stream"],
     types: ["movie"],
     catalogs: [
@@ -28,18 +28,19 @@ app.get("/manifest.json", (req, res) => {
         name: "أفلام عربية"
       }
     ],
-    idPrefixes: ["tmdb:"]
+    idPrefixes: ["tmdb:", "tt"]
   });
 });
 
-// 2. Catalog (TMDB)
+// 2. Catalog (أعلى جودة بوسترات عربية من TMDB)
 app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
       params: {
         api_key: TMDB_API_KEY,
         with_original_language: "ar",
-        language: "ar-SA",
+        language: "ar-EG",
+        include_image_language: "ar,null",
         sort_by: "popularity.desc",
         page: 1
       }
@@ -51,8 +52,8 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
       name: movie.title,
       poster: movie.poster_path
         ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-        : "https://via.placeholder.com/300x450?text=No+Poster",
-      description: movie.overview
+        : "https://via.placeholder.com/500x750?text=بدون+بوستر",
+      description: movie.overview || "لا يوجد وصف متاح."
     }));
 
     res.json({ metas });
@@ -61,34 +62,39 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (ربط مباشر بالسيرفرات المتاحة)
+// 3. Streams (الروابط الـ 5 المحددة بالجودات)
 app.get("/stream/movie/:id.json", async (req, res) => {
-  const tmdbId = req.params.id.replace("tmdb:", "");
+  const rawId = req.params.id;
+  const tmdbId = rawId.replace("tmdb:", "");
 
-  const streams = [
-    {
-      title: "🔥 Fast Server 1 | 1080p Full HD",
-      url: `https://vidsrc.to/embed/movie/${tmdbId}`
-    },
-    {
-      title: "🎬 ArabServer | 1080p HD",
-      url: `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
-    },
-    {
-      title: "⚡ StreamHQ | 720p HD",
-      url: `https://embed.su/embed/movie/${tmdbId}`
-    },
-    {
-      title: "📱 Mobile Server | 720p",
-      url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
-    },
-    {
-      title: "📉 Data Saver | 480p",
-      url: `https://vidsrc.icu/embed/movie/${tmdbId}`
-    }
-  ];
+  try {
+    const streams = [
+      {
+        title: "🎬 WeCima | 1080p (سيرفر رئيسي 1)",
+        url: `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
+      },
+      {
+        title: "🎬 FaselHD | 1080p (سيرفر رئيسي 2)",
+        url: `https://vidsrc.to/embed/movie/${tmdbId}`
+      },
+      {
+        title: "⚡ WeCima | 720p (سيرفر سريع 1)",
+        url: `https://embed.su/embed/movie/${tmdbId}`
+      },
+      {
+        title: "⚡ FaselHD | 720p (سيرفر سريع 2)",
+        url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
+      },
+      {
+        title: "📱 FaselHD | 480p (سيرفر اقتصادي)",
+        url: `https://vidsrc.icu/embed/movie/${tmdbId}`
+      }
+    ];
 
-  res.json({ streams });
+    res.json({ streams });
+  } catch (error) {
+    res.json({ streams: [] });
+  }
 });
 
 module.exports = app;
