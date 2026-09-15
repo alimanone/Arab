@@ -15,10 +15,10 @@ app.use((req, res, next) => {
 // 1. Manifest
 app.get("/manifest.json", (req, res) => {
   res.json({
-    id: "org.arabic.real.torrent",
-    version: "6.0.0",
-    name: "عرب سينما الحقيقي | P2P Direct",
-    description: "تشغيل مباشر لجميع الأفلام والمسلسلات عبر شبكة التورنت المفتوحة",
+    id: "org.arabic.direct.addon",
+    version: "8.0.0",
+    name: "عرب ميديا المباشر | Direct Fast",
+    description: "أفلام ومسلسلات عربية وأجنبية بجودات سريعة وبدون تعقيد",
     resources: ["catalog", "stream"],
     types: ["movie", "series"],
     catalogs: [
@@ -29,7 +29,7 @@ app.get("/manifest.json", (req, res) => {
   });
 });
 
-// 2. Kinds / Catalogs
+// 2. Catalog
 app.get("/catalog/:type/:id.json", async (req, res) => {
   const { type } = req.params;
   try {
@@ -59,13 +59,12 @@ app.get("/catalog/:type/:id.json", async (req, res) => {
   }
 });
 
-// 3. Streams (توليد روابط InfoHash شغال مع Nuvio مباشرة)
+// 3. Streams (مباشر وبدون بروكسي)
 app.get("/stream/:type/:id.json", async (req, res) => {
   const { type, id } = req.params;
   const tmdbId = id.replace("tmdb:", "");
 
   try {
-    // 1. تحويل TMDB ID إلى IMDb ID
     const externalRes = await axios.get(`${TMDB_BASE_URL}/${type}/${tmdbId}/external_ids`, {
       params: { api_key: TMDB_API_KEY }
     });
@@ -73,35 +72,53 @@ app.get("/stream/:type/:id.json", async (req, res) => {
 
     let streams = [];
 
-    // 2. لو لقينات IMDb ID هنجيب التورنت المباشر الحقيقي
+    // 1. جلب التورنت الأجنبي المفلتر (إلغاء الـ 4K)
     if (imdbId) {
       try {
-        const p2pRes = await axios.get(`https://torrentio.strem.fun/stream/${type}/${imdbId}.json`, { timeout: 4000 });
-        if (p2pRes.data && p2pRes.data.streams && p2pRes.data.streams.length > 0) {
-          streams = p2pRes.data.streams.map((s) => ({
-            name: "P2P Direct Torrent",
-            title: `${s.title || "فيلم/مسلسل"}\n⚙️ تشغيل فوري بدون إعلانات`,
+        const p2pRes = await axios.get(`https://torrentio.strem.fun/stream/${type}/${imdbId}.json`, { timeout: 3000 });
+        if (p2pRes.data && p2pRes.data.streams) {
+          // فلترة التورنت لاستبعاد جودات 4K و 2160p
+          const no4k = p2pRes.data.streams.filter(s => !s.title.includes("4K") && !s.title.includes("2160p"));
+          
+          streams = no4k.slice(0, 3).map((s, idx) => ({
+            name: `Direct Stream [${idx === 0 ? '1080p' : '720p'}]`,
+            title: `${s.title}\n⚡ تشغيل سريع بدون تقطيع`,
             infoHash: s.infoHash,
             fileIdx: s.fileIdx || 0
           }));
         }
       } catch (e) {
-        console.log("P2P Error");
+        console.log("P2P skip");
       }
     }
 
-    // 3. لو محتواش تورنت، هيحط روابط مباشرة تفهمها مشغلات الموبايل
-    if (streams.length === 0) {
-      streams = [
-        {
-          name: "Direct Video Stream",
-          title: "🎬 سيرفر مباشر 1080p\n(يتطلب فتح المشغل الخارجي VLC)",
-          url: `https://vidsrc.vip/embed/${type}/${tmdbId}`
-        }
-      ];
-    }
+    // 2. سيرفرات البث العربي السريعة المباشرة
+    const directArab = [
+      {
+        name: "عرب سينما VIP",
+        title: "🎬 سيرفر ممتاز 1080p\n⚡ تشغيل فوري",
+        url: `https://vidsrc.vip/embed/${type}/${tmdbId}`
+      },
+      {
+        name: "عرب سينما HD",
+        title: "🎬 سيرفر رئيسي 1080p\n⚡ سريع جداً",
+        url: `https://autoembed.co/${type}/tmdb/${tmdbId}`
+      },
+      {
+        name: "عرب سينما FAST",
+        title: "⚡ سيرفر 720p HD\n📱 خفيف للموبايل",
+        url: `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`
+      },
+      {
+        name: "عرب سينما SD",
+        title: "📉 سيرفر اقتصادي 480p\n📉 توفير البيانات",
+        url: `https://2embed.cc/embed/${tmdbId}`
+      }
+    ];
 
-    res.json({ streams: streams.slice(0, 5) });
+    const allStreams = [...streams, ...directArab].slice(0, 5);
+
+    res.json({ streams: allStreams });
   } catch (error) {
     res.json({ streams: [] });
   }
