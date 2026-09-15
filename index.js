@@ -12,13 +12,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// 1. Manifest
+// 1. Manifest (معرف خصيصاً للتوافق مع Nuvio)
 app.get("/manifest.json", (req, res) => {
   res.json({
-    id: "org.arabic.addon.ali",
-    version: "2.0.0",
-    name: "عرب سينما المجاني | Ali",
-    description: "أفلام عربية عبر التورنت المباشر المجاني",
+    id: "org.arabic.addon.ali.nuvio",
+    version: "3.0.0",
+    name: "عرب سينما Nuvio | Ali",
+    description: "إضافة الأفلام العربية المحسنة لمشغلات Nuvio و Stremio",
     resources: ["catalog", "stream"],
     types: ["movie"],
     catalogs: [
@@ -32,7 +32,7 @@ app.get("/manifest.json", (req, res) => {
   });
 });
 
-// 2. Catalog (أعلى جودة بوسترات عربية)
+// 2. Catalog (كتالوج ومحتوى عالي الدقة)
 app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
@@ -62,38 +62,41 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (روابط مجانية تعمل داخل مشغل Stremio المباشر)
+// 3. Streams (استجابة بتنسيق Direct Stream متوافق مع Nuvio)
 app.get("/stream/movie/:id.json", async (req, res) => {
   const rawId = req.params.id;
   const tmdbId = rawId.replace("tmdb:", "");
 
   try {
-    // جلب معلومات الفيلم من TMDB
     const tmdbRes = await axios.get(`${TMDB_BASE_URL}/movie/${tmdbId}`, {
       params: { api_key: TMDB_API_KEY, language: "ar-EG" }
     });
-    const imdbId = tmdbRes.data.imdb_id || rawId;
 
-    // 5 جودات/سيرفرات مفتوحة البث مجاناً
+    // سحب الروابط بتنسيقات يفهمها Nuvio Player مباشرة
     const streams = [
       {
-        title: "⚡ TorrentStream | 1080p [سيرفر مجاني 1]",
+        name: "Nuvio VIP",
+        title: "🎬 ArabStream | 1080p FHD\n⚡ تشغيل فوري مجاني",
         url: `https://vidsrc.stream/embed/movie/${tmdbId}`
       },
       {
-        title: "⚡ FastTorrent | 1080p [سيرفر مجاني 2]",
-        url: `https://moviesapi.club/movie/${imdbId}`
-      },
-      {
-        title: "🎬 WebTorrent | 720p [سيرفر مجاني 1]",
+        name: "Nuvio Fast",
+        title: "🎬 CimaDrive | 1080p HD\n⚡ سيرفر سريع",
         url: `https://autoembed.co/movie/tmdb/${tmdbId}`
       },
       {
-        title: "🎬 P2P Stream | 720p [سيرفر مجاني 2]",
+        name: "Nuvio Mobile",
+        title: "⚡ AkoamDirect | 720p\n📱 مناسب للموبايل",
+        url: `https://moviesapi.club/movie/${tmdbId}`
+      },
+      {
+        name: "Nuvio Light",
+        title: "⚡ FaselStream | 720p\n📱 سيرفر بديل",
         url: `https://player.smashystream.com/movie/${tmdbId}`
       },
       {
-        title: "📱 Low Data | 480p [سيرفر اقتصادي]",
+        name: "Nuvio Low",
+        title: "📱 DataSaver | 480p\n📉 اقتصادي",
         url: `https://2embed.cc/embed/${tmdbId}`
       }
     ];
