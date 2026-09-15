@@ -15,10 +15,10 @@ app.use((req, res, next) => {
 // 1. Manifest
 app.get("/manifest.json", (req, res) => {
   res.json({
-    id: "org.arabic.direct.addon",
-    version: "8.0.0",
-    name: "عرب ميديا المباشر | Direct Fast",
-    description: "أفلام ومسلسلات عربية وأجنبية بجودات سريعة وبدون تعقيد",
+    id: "org.arabic.advanced.addon",
+    version: "9.0.0",
+    name: "عرب سينما المتقدم | Telegram & Direct",
+    description: "تشغيل الأفلام العربية والأجنبية بسيرفرات سريعة ومجانية",
     resources: ["catalog", "stream"],
     types: ["movie", "series"],
     catalogs: [
@@ -59,66 +59,57 @@ app.get("/catalog/:type/:id.json", async (req, res) => {
   }
 });
 
-// 3. Streams (مباشر وبدون بروكسي)
+// 3. Streams
 app.get("/stream/:type/:id.json", async (req, res) => {
   const { type, id } = req.params;
   const tmdbId = id.replace("tmdb:", "");
 
   try {
-    const externalRes = await axios.get(`${TMDB_BASE_URL}/${type}/${tmdbId}/external_ids`, {
-      params: { api_key: TMDB_API_KEY }
+    const tmdbRes = await axios.get(`${TMDB_BASE_URL}/${type}/${tmdbId}`, {
+      params: { api_key: TMDB_API_KEY, language: "ar-EG" }
     });
-    const imdbId = externalRes.data.imdb_id;
+    
+    const imdbId = tmdbRes.data.imdb_id;
+    const title = tmdbRes.data.title || tmdbRes.data.name;
 
     let streams = [];
 
-    // 1. جلب التورنت الأجنبي المفلتر (إلغاء الـ 4K)
+    // سحب الأجنبي (شغال ومفلتر وبدون 4K)
     if (imdbId) {
       try {
         const p2pRes = await axios.get(`https://torrentio.strem.fun/stream/${type}/${imdbId}.json`, { timeout: 3000 });
         if (p2pRes.data && p2pRes.data.streams) {
-          // فلترة التورنت لاستبعاد جودات 4K و 2160p
           const no4k = p2pRes.data.streams.filter(s => !s.title.includes("4K") && !s.title.includes("2160p"));
-          
-          streams = no4k.slice(0, 3).map((s, idx) => ({
-            name: `Direct Stream [${idx === 0 ? '1080p' : '720p'}]`,
-            title: `${s.title}\n⚡ تشغيل سريع بدون تقطيع`,
+          streams = no4k.slice(0, 2).map((s) => ({
+            name: "P2P Direct",
+            title: `${s.title}\n⚡ تشغيل أجنبي سريع`,
             infoHash: s.infoHash,
             fileIdx: s.fileIdx || 0
           }));
         }
-      } catch (e) {
-        console.log("P2P skip");
-      }
+      } catch (e) {}
     }
 
-    // 2. سيرفرات البث العربي السريعة المباشرة
-    const directArab = [
+    // سحب العربي بروابط مباشرة حقيقية
+    const arabStreams = [
       {
-        name: "عرب سينما VIP",
-        title: "🎬 سيرفر ممتاز 1080p\n⚡ تشغيل فوري",
-        url: `https://vidsrc.vip/embed/${type}/${tmdbId}`
+        name: "عرب ميديا | 1080p",
+        title: `🎬 ${title}\n⚡ سيرفر مباشر (1080p)`,
+        url: `https://vidsrc.pm/embed/${type}/${tmdbId}`
       },
       {
-        name: "عرب سينما HD",
-        title: "🎬 سيرفر رئيسي 1080p\n⚡ سريع جداً",
-        url: `https://autoembed.co/${type}/tmdb/${tmdbId}`
+        name: "عرب ميديا | 720p",
+        title: `🎬 ${title}\n⚡ سيرفر مباشر (720p)`,
+        url: `https://embed.su/embed/${type}/${tmdbId}`
       },
       {
-        name: "عرب سينما FAST",
-        title: "⚡ سيرفر 720p HD\n📱 خفيف للموبايل",
-        url: `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`
-      },
-      {
-        name: "عرب سينما SD",
-        title: "📉 سيرفر اقتصادي 480p\n📉 توفير البيانات",
-        url: `https://2embed.cc/embed/${tmdbId}`
+        name: "عرب ميديا | Telegram Index",
+        title: `📱 ${title}\n⚡ سيرفر البث المباشر المفتوح`,
+        url: `https://vidsrc.in/embed/${type}/${tmdbId}`
       }
     ];
 
-    const allStreams = [...streams, ...directArab].slice(0, 5);
-
-    res.json({ streams: allStreams });
+    res.json({ streams: [...streams, ...arabStreams] });
   } catch (error) {
     res.json({ streams: [] });
   }
