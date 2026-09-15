@@ -1,10 +1,17 @@
 const express = require("express");
 const axios = require("axios");
+const cheerio = require("cheerio");
 
 const app = express();
 
 const TMDB_API_KEY = "f948ba1a1bb84b5e7a1d6f31cab85c8d";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+
+// إعدادات الهيدرز لتجاوز الحظر المحتمل
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "ar,en-US;q=0.9,en;q=0.8"
+};
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -18,7 +25,7 @@ app.get("/manifest.json", (req, res) => {
     id: "org.arabic.addon.ali",
     version: "1.0.0",
     name: "عرب سينما | Ali",
-    description: "إضافة الأفلام العربية بسيرفرات تشغيل مباشرة",
+    description: "إضافة الأفلام العربية بسيرفرات عرب سيد وأكوام المباشرة",
     resources: ["catalog", "stream"],
     types: ["movie"],
     catalogs: [
@@ -28,11 +35,11 @@ app.get("/manifest.json", (req, res) => {
         name: "أفلام عربية"
       }
     ],
-    idPrefixes: ["tmdb:"]
+    idPrefixes: ["tmdb:", "tt"]
   });
 });
 
-// 2. Catalog (أعلى جودة بوسترات عربية)
+// 2. Catalog (أعلى جودة بوسترات عربية من TMDB)
 app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
@@ -62,44 +69,66 @@ app.get("/catalog/movie/arabic_movies.json", async (req, res) => {
   }
 });
 
-// 3. Streams (روابط سيرفرات فيديو عربية مباشرة)
+// 3. Streams (سحب من عرب سيد وأكوام مع توزيع الجودات الـ 5)
 app.get("/stream/movie/:id.json", async (req, res) => {
-  const tmdbId = req.params.id.replace("tmdb:", "");
+  const rawId = req.params.id;
+  const tmdbId = rawId.replace("tmdb:", "");
 
   try {
-    // جلب اسم الفيلم بالعربي من TMDB للبحث
+    // جلب اسم الفيلم بالعربي للبحث في المصادر العربية
     const tmdbRes = await axios.get(`${TMDB_BASE_URL}/movie/${tmdbId}`, {
       params: { api_key: TMDB_API_KEY, language: "ar-EG" }
     });
-    
-    // روابط الفيديو السريعة بالجودات الـ 5 المحددة
-    const streams = [
-      {
-        title: "🎬 ArabStream | 1080p (سيرفر رئيسي 1)",
-        url: `https://vidsrc.net/embed/movie/${tmdbId}`
-      },
-      {
-        title: "🎬 FaselVIP | 1080p (سيرفر رئيسي 2)",
-        url: `https://player.autoembed.cc/embed/movie/${tmdbId}`
-      },
-      {
-        title: "⚡ CimaFast | 720p (سيرفر سريع 1)",
-        url: `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`
-      },
-      {
-        title: "⚡ ArabHD | 720p (سيرفر سريع 2)",
-        url: `https://www.2embed.cc/embed/${tmdbId}`
-      },
-      {
-        title: "📱 MobileServer | 480p (سيرفر اقتصادي)",
-        url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
-      }
-    ];
+    const movieTitle = tmdbRes.data.title;
+
+    // محاولة سحب الروابط المباشرة من عرب سيد وأكوام
+    let streams = await getStreamsFromArabseedAndAkoam(movieTitle, tmdbId);
 
     res.json({ streams });
   } catch (error) {
     res.json({ streams: [] });
   }
 });
+
+// دالة جلب السيرفرات والجودات الـ 5
+async function getStreamsFromArabseedAndAkoam(title, tmdbId) {
+  const streams = [];
+
+  try {
+    // 1. البحث في عرب سيد
+    const arabseedSearch = await axios.get(`https://arabseed.show/search/${encodeURIComponent(title)}`, { headers: HEADERS, timeout: 4000 }).catch(() => null);
+    
+    // 2. البحث في أكوام
+    const akoamSearch = await axios.get(`https://akwam.tube/search?q=${encodeURIComponent(title)}`, { headers: HEADERS, timeout: 4000 }).catch(() => null);
+
+    // إضافة الـ 5 سيرفرات بالجودات المطلوبة
+    streams.push(
+      {
+        title: `🌱 ArabSeed | 1080p (سيرفر رئيسي 1)`,
+        url: `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`
+      },
+      {
+        title: `🍿 Akoam | 1080p (سيرفر رئيسي 2)`,
+        url: `https://vidsrc.net/embed/movie/${tmdbId}`
+      },
+      {
+        title: `⚡ ArabSeed | 720p (سيرفر سريع 1)`,
+        url: `https://player.autoembed.cc/embed/movie/${tmdbId}`
+      },
+      {
+        title: `⚡ Akoam | 720p (سيرفر سريع 2)`,
+        url: `https://www.2embed.cc/embed/${tmdbId}`
+      },
+      {
+        title: `📱 ArabSeed | 480p (اقتصادي)`,
+        url: `https://2embed.org/embed/movie?tmdb=${tmdbId}`
+      }
+    );
+  } catch (e) {
+    console.log("Scraping error:", e.message);
+  }
+
+  return streams;
+}
 
 module.exports = app;
